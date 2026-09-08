@@ -1,0 +1,20 @@
+{
+  "name": "muzo-music",
+  "version": "2.0.0",
+  "description": "Muzo - Free Music Player with smart recommendations, synced lyrics, playlists, and mobile PWA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "music",
+    "player",
+    "muzo",
+    "streaming",
+    "free-music"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

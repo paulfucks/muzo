@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Muzo
+Comment=Free Music Streaming Player (Spotify Alternative)
+Exec=bash -c "cd $(dirname %k) && ./muzo.sh"
+Icon=public/icon-512.png
+Terminal=false
+Categories=AudioVideo;Audio;Player;Music;
+StartupWMClass=muzo

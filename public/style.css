@@ -1,0 +1,214 @@
+/* Muzo - Stylesheet */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+* {
+  box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* Custom Scrollbars */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.2);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.4);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Nav Button Active State */
+.nav-btn.active {
+  color: #ffffff;
+  background-color: rgba(34, 211, 238, 0.12);
+  border-left: 3px solid #22d3ee;
+}
+
+.nav-btn.active i {
+  color: #22d3ee;
+}
+
+/* Genre Pills */
+.genre-pill.active {
+  background-color: #22d3ee;
+  color: #000000;
+  box-shadow: 0 0 15px rgba(34, 211, 238, 0.3);
+}
+
+/* Music Card Hover Effects */
+.music-card {
+  transition: all 0.25s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.music-card:hover {
+  background-color: #262626;
+  transform: translateY(-4px);
+  border-color: rgba(34, 211, 238, 0.25);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 20px -5px rgba(34, 211, 238, 0.15);
+}
+
+.music-card .play-btn {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.25s ease-out;
+  background: linear-gradient(135deg, #2dd4bf 0%, #22d3ee 100%);
+  color: #000000;
+}
+
+.music-card:hover .play-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Table Row Hover */
+.track-row {
+  transition: background-color 0.15s ease;
+}
+
+.track-row:hover {
+  background-color: rgba(34, 211, 238, 0.08);
+}
+
+.track-row:hover .row-index {
+  display: none;
+}
+
+.track-row .row-play-btn {
+  display: none;
+}
+
+.track-row:hover .row-play-btn {
+  display: inline-flex;
+  color: #22d3ee;
+}
+
+/* Synced Lyrics Karaoke Styling */
+.lyric-line {
+  transition: all 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 1.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 12px;
+}
+
+.lyric-line:hover {
+  color: rgba(34, 211, 238, 0.85);
+  background-color: rgba(34, 211, 238, 0.08);
+}
+
+.lyric-line.active {
+  color: #ffffff;
+  font-size: 2.1rem;
+  font-weight: 800;
+  text-shadow: 0 0 30px rgba(34, 211, 238, 0.6), 0 0 12px rgba(255, 255, 255, 0.4);
+  transform: scale(1.03);
+}
+
+/* Range Input Slider Styling */
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.group:hover input[type=range]::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+input[type=range]::-webkit-slider-thumb:hover {
+  background: #22d3ee;
+  transform: scale(1.2);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+}
+
+/* Animated Equalizer Bar in Cyan */
+@keyframes eq-bounce {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+.eq-bar {
+  display: inline-block;
+  width: 3px;
+  background-color: #22d3ee;
+  border-radius: 2px;
+  animation: eq-bounce 1s infinite ease-in-out;
+}
+
+.eq-bar:nth-child(1) { animation-delay: 0.1s; }
+.eq-bar:nth-child(2) { animation-delay: 0.3s; }
+.eq-bar:nth-child(3) { animation-delay: 0.2s; }
+.eq-bar:nth-child(4) { animation-delay: 0.4s; }
+
+/* Ultra-Fast Unthrottled YouTube Engine */
+#mini-video-container {
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#mini-video-container.video-docked {
+  width: 240px;
+  height: 135px;
+  opacity: 0.015;
+  pointer-events: none;
+  transform: translate(140px, 70px);
+  z-index: 5;
+}
+
+#mini-video-container.video-open {
+  width: 360px;
+  height: 220px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(0, 0);
+  z-index: 50;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85), 0 0 25px rgba(34, 211, 238, 0.35);
+}
+
+/* Mobile Fullscreen Player Slide */
+#mobile-player-modal {
+  transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1);
+  will-change: transform;
+}
+
+#mobile-player-modal.open {
+  transform: translateY(0) !important;
+}
+
+/* Safe Area Inset Support for Modern Phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .mobile-safe-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+}

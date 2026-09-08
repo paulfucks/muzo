@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Muzo - Free Music Streaming</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#121212">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Muzo">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            spotify: {
+              green: '#22d3ee',        /* Electric Aqua / Cyan from icon */
+              greenHover: '#67e8f9',   /* Bright Cyan Hover */
+              black: '#121212',
+              card: '#181818',
+              cardHover: '#262626',
+              lightDark: '#222222',
+              subtext: '#a3a3a3'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-black text-white h-screen flex flex-col overflow-hidden font-sans select-none">
+
+  <!-- Main App Layout -->
+  <div class="flex flex-1 overflow-hidden relative">
+
+    <!-- Left Sidebar (Desktop) -->
+    <aside class="hidden md:flex w-64 bg-spotify-black p-4 flex flex-col gap-3 shrink-0 select-none border-r border-white/5">
+      <!-- Logo -->
+      <div class="flex items-center gap-3 px-2 py-3 cursor-pointer" onclick="showView('home')">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-emerald-400 via-teal-400 to-cyan-400 flex items-center justify-center shadow-lg shadow-cyan-500/25 transition-transform hover:scale-105">
+          <i data-lucide="disc-3" class="w-5 h-5 text-black stroke-[2.5]"></i>
+        </div>
+        <span class="text-2xl font-black tracking-tight bg-gradient-to-r from-white via-cyan-100 to-teal-200 bg-clip-text text-transparent">Muzo</span>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex flex-col gap-1 mt-2">
+        <button id="nav-home" onclick="showView('home')" class="nav-btn active flex items-center gap-4 px-3 py-3 rounded-lg text-sm font-semibold transition text-white hover:text-white hover:bg-white/10">
+          <i data-lucide="home" class="w-5 h-5"></i>
+          <span>Home</span>
+        </button>
+        <button id="nav-search" onclick="focusSearch()" class="nav-btn flex items-center gap-4 px-3 py-3 rounded-lg text-sm font-semibold transition text-spotify-subtext hover:text-white hover:bg-white/10">
+          <i data-lucide="search" class="w-5 h-5"></i>
+          <span>Search</span>
+        </button>
+        <button id="nav-library" onclick="showView('library')" class="nav-btn flex items-center gap-4 px-3 py-3 rounded-lg text-sm font-semibold transition text-spotify-subtext hover:text-white hover:bg-white/10">
+          <i data-lucide="library" class="w-5 h-5"></i>
+          <span>Your Library</span>
+        </button>
+      </nav>
+
+      <!-- Library / Playlists Divider -->
+      <div class="h-px bg-white/10 my-2"></div>
+
+      <!-- Playlists Section -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between px-2 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-spotify-subtext">Playlists</span>
+          <button onclick="openCreatePlaylistModal()" title="Create Playlist" class="text-spotify-subtext hover:text-cyan-300 hover:bg-white/10 p-1.5 rounded-full transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Liked Songs Quick Tile -->
+        <div onclick="showLikedSongs()" class="flex items-center gap-3 p-2.5 rounded-lg cursor-pointer hover:bg-white/10 transition group mb-1">
+          <div class="w-10 h-10 rounded-md bg-gradient-to-br from-teal-500 via-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/20">
+            <i data-lucide="heart" class="w-5 h-5 text-black fill-black"></i>
+          </div>
+          <div class="overflow-hidden">
+            <div class="text-sm font-semibold text-white truncate">Liked Songs</div>
+            <div id="liked-count" class="text-xs text-spotify-subtext">0 songs</div>
+          </div>
+        </div>
+
+        <!-- Custom Playlists List -->
+        <div id="sidebar-playlists" class="flex-1 overflow-y-auto space-y-1 pr-1 custom-scrollbar text-sm">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Free Streaming Badge -->
+      <div class="bg-gradient-to-r from-teal-950/60 to-cyan-950/60 border border-cyan-500/20 rounded-xl p-3 text-xs flex items-center gap-2.5">
+        <div class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
+        <div class="text-neutral-300">
+          <span class="font-bold text-white block">Muzo Unlimited Free</span>
+          No Subscriptions • No Ads
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center Stage / Main Content -->
+    <main class="flex-1 flex flex-col bg-gradient-to-b from-[#141d24] via-[#121212] to-[#121212] overflow-hidden relative">
+
+      <!-- Top Header Navigation -->
+      <header class="h-16 px-4 md:px-6 flex items-center justify-between border-b border-white/5 bg-black/40 backdrop-blur-md z-20 shrink-0">
+        <!-- Mobile Brand Logo (Visible only on mobile) -->
+        <div class="flex md:hidden items-center gap-2 mr-3 cursor-pointer shrink-0" onclick="showView('home')">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-400 via-teal-400 to-cyan-400 flex items-center justify-center shadow-md shadow-cyan-500/25">
+            <i data-lucide="disc-3" class="w-4 h-4 text-black stroke-[2.5]"></i>
+          </div>
+          <span class="text-lg font-black tracking-tight bg-gradient-to-r from-white via-cyan-100 to-teal-200 bg-clip-text text-transparent">Muzo</span>
+        </div>
+
+        <!-- Search Input -->
+        <div class="relative w-full max-w-md">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i data-lucide="search" class="w-4 h-4 text-spotify-subtext"></i>
+          </div>
+          <input
+            id="search-input"
+            type="text"
+            placeholder="Search any song, artist, album..."
+            autocomplete="off"
+            class="w-full pl-9 pr-10 py-2 bg-spotify-cardHover hover:bg-[#333] focus:bg-[#2e2e2e] text-sm text-white placeholder-spotify-subtext rounded-full outline-none focus:ring-2 focus:ring-cyan-400 transition border border-transparent focus:border-cyan-400"
+          />
+          <button id="search-clear" onclick="clearSearch()" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-spotify-subtext hover:text-white">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+
+          <!-- Autocomplete Suggestions Dropdown -->
+          <div id="suggestions-dropdown" class="hidden absolute top-full mt-2 left-0 w-full bg-[#242424] border border-cyan-500/20 rounded-xl shadow-2xl overflow-hidden z-50">
+            <div id="suggestions-list" class="divide-y divide-white/5 text-sm py-1"></div>
+          </div>
+        </div>
+
+        <!-- Category Filter Pills (Desktop) -->
+        <div class="hidden lg:flex items-center gap-2 ml-4 overflow-x-auto no-scrollbar py-1">
+          <button onclick="loadChartCategory('trending')" class="genre-pill active px-3.5 py-1.5 rounded-full text-xs font-semibold bg-cyan-400 text-black shadow-md shadow-cyan-400/20 transition">All / Trending</button>
+          <button onclick="loadChartCategory('anime')" class="genre-pill px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition">Anime / OST</button>
+          <button onclick="loadChartCategory('pop')" class="genre-pill px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition">Pop</button>
+          <button onclick="loadChartCategory('hiphop')" class="genre-pill px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition">Hip-Hop</button>
+          <button onclick="loadChartCategory('chill')" class="genre-pill px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition">Chill / Lofi</button>
+          <button onclick="loadChartCategory('rock')" class="genre-pill px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition">Rock</button>
+          <button onclick="loadChartCategory('bollywood')" class="genre-pill px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition">Bollywood</button>
+        </div>
+
+        <!-- Right Header Icons -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="openMobileConnectModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-teal-500/15 to-cyan-500/15 hover:from-teal-500/25 hover:to-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition hover:scale-105 shadow-sm shadow-cyan-500/10" title="Connect Phone / Tablet">
+            <i data-lucide="smartphone" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Phone App</span>
+          </button>
+          <button onclick="toggleLyrics()" title="Lyrics" class="hidden sm:inline-flex p-2 rounded-full hover:bg-white/10 text-spotify-subtext hover:text-cyan-300 transition relative">
+            <i data-lucide="mic" class="w-5 h-5"></i>
+          </button>
+          <button onclick="toggleQueue()" title="Queue" class="p-2 rounded-full hover:bg-white/10 text-spotify-subtext hover:text-cyan-300 transition relative">
+            <i data-lucide="list-music" class="w-5 h-5"></i>
+            <span id="queue-badge" class="hidden absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400"></span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Main Views -->
+      <div id="main-scroll" class="flex-1 overflow-y-auto custom-scrollbar p-3.5 sm:p-6 pb-36 md:pb-24">
+
+        <!-- VIEW: Home Dashboard -->
+        <section id="view-home" class="view-panel space-y-8">
+          <!-- Dynamic Greeting Header -->
+          <div>
+            <h1 id="greeting-text" class="text-3xl font-bold tracking-tight text-white mb-4">Good Evening</h1>
+            <!-- Quick Picks Grid -->
+            <div id="quick-picks-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- SMART RECOMMENDATION ENGINE: Recommended For You -->
+          <div id="recommendations-section" class="space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <h2 id="recommendations-heading" class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                  <i data-lucide="sparkles" class="w-6 h-6 text-cyan-400"></i>
+                  <span>Recommended For You</span>
+                </h2>
+                <span id="recommendation-badge" class="text-xs bg-cyan-500/20 text-cyan-300 px-2.5 py-0.5 rounded-full font-medium border border-cyan-500/30">Smart Taste Match</span>
+              </div>
+              <button onclick="refreshRecommendations()" title="Refresh Recommendations" class="text-xs text-spotify-subtext hover:text-cyan-300 flex items-center gap-1.5 px-3 py-1 rounded-full hover:bg-white/10 transition">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Refresh</span>
+              </button>
+            </div>
+            <div id="recommendations-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              <!-- Dynamically populated based on what user plays -->
+            </div>
+          </div>
+
+          <!-- Section: Featured Charts -->
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <h2 id="charts-heading" class="text-2xl font-bold text-white tracking-tight">🔥 Trending Today</h2>
+              <span class="text-xs text-spotify-subtext font-medium">Updated constantly</span>
+            </div>
+            <div id="trending-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Section: Curated Moods -->
+          <div>
+            <h2 class="text-2xl font-bold text-white tracking-tight mb-4">🎧 Moods & Mixes</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <div onclick="searchAndPlayQuery('Calm Sad Anime OST Beautiful Japanese')" class="mood-card p-4 rounded-xl bg-gradient-to-br from-teal-950/60 to-cyan-950/40 border border-cyan-500/20 cursor-pointer hover:scale-[1.02] transition">
+                <div class="text-3xl mb-2">🌸</div>
+                <div class="font-bold text-white text-base">Anime & Chill OST</div>
+                <div class="text-xs text-spotify-subtext">Emotional melodies & themes</div>
+              </div>
+              <div onclick="searchAndPlayQuery('Chill Lofi Study Beats')" class="mood-card p-4 rounded-xl bg-gradient-to-br from-indigo-950/60 to-blue-950/40 border border-white/5 cursor-pointer hover:scale-[1.02] transition">
+                <div class="text-3xl mb-2">☕</div>
+                <div class="font-bold text-white text-base">Focus & Lofi</div>
+                <div class="text-xs text-spotify-subtext">Peaceful beats to study & relax</div>
+              </div>
+              <div onclick="searchAndPlayQuery('Gym Workout Motivational Hip Hop')" class="mood-card p-4 rounded-xl bg-gradient-to-br from-red-950/60 to-amber-950/40 border border-white/5 cursor-pointer hover:scale-[1.02] transition">
+                <div class="text-3xl mb-2">⚡</div>
+                <div class="font-bold text-white text-base">Workout Energy</div>
+                <div class="text-xs text-spotify-subtext">High adrenaline bass & trap</div>
+              </div>
+              <div onclick="searchAndPlayQuery('Pop Hits Party Dance')" class="mood-card p-4 rounded-xl bg-gradient-to-br from-purple-950/60 to-pink-950/40 border border-white/5 cursor-pointer hover:scale-[1.02] transition">
+                <div class="text-3xl mb-2">🎉</div>
+                <div class="font-bold text-white text-base">Party Hits</div>
+                <div class="text-xs text-spotify-subtext">Top dance pop & club anthems</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: Search Results -->
+        <section id="view-search" class="view-panel hidden space-y-6">
+          <div class="flex items-center justify-between">
+            <h2 id="search-title" class="text-2xl font-bold text-white tracking-tight">Search Results</h2>
+            <span id="search-count" class="text-xs text-spotify-subtext"></span>
+          </div>
+
+          <!-- Top Result Spotlight + Song List -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Top Result Hero Card -->
+            <div id="top-result-card" class="lg:col-span-5 bg-spotify-card hover:bg-spotify-cardHover p-5 rounded-2xl transition group relative cursor-pointer border border-white/5">
+              <!-- Injected by app.js -->
+            </div>
+
+            <!-- Songs List -->
+            <div class="lg:col-span-7 flex flex-col">
+              <h3 class="text-lg font-bold text-white mb-2">Songs</h3>
+              <div id="search-results-list" class="space-y-1">
+                <!-- Injected by app.js -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: Playlist & Library Detail -->
+        <section id="view-playlist" class="view-panel hidden space-y-6">
+          <!-- Playlist Header -->
+          <div class="flex flex-col sm:flex-row items-center sm:items-end gap-6 p-6 rounded-2xl bg-gradient-to-b from-cyan-900/40 via-spotify-card to-transparent border border-cyan-500/20">
+            <div id="playlist-artwork" class="w-44 h-44 rounded-xl bg-spotify-cardHover flex items-center justify-center shadow-2xl overflow-hidden shrink-0">
+              <i data-lucide="music" class="w-16 h-16 text-spotify-subtext"></i>
+            </div>
+            <div class="flex-1 text-center sm:text-left">
+              <span id="playlist-type" class="text-xs font-bold uppercase tracking-wider text-cyan-400">Playlist</span>
+              <h1 id="playlist-title" class="text-3xl sm:text-4xl font-black text-white mt-1 mb-2 tracking-tight">Liked Songs</h1>
+              <p id="playlist-desc" class="text-sm text-spotify-subtext mb-4">Your saved favorites</p>
+              <div class="flex items-center justify-center sm:justify-start gap-4">
+                <button id="playlist-play-btn" onclick="playCurrentPlaylist()" class="w-12 h-12 rounded-full bg-cyan-400 hover:bg-cyan-300 flex items-center justify-center text-black shadow-lg shadow-cyan-500/30 transition hover:scale-105 active:scale-95">
+                  <i data-lucide="play" class="w-6 h-6 fill-black ml-0.5"></i>
+                </button>
+                <button id="playlist-shuffle-btn" onclick="shuffleCurrentPlaylist()" title="Shuffle Play" class="p-3 rounded-full hover:bg-white/10 text-spotify-subtext hover:text-cyan-300 transition">
+                  <i data-lucide="shuffle" class="w-5 h-5"></i>
+                </button>
+                <button id="playlist-delete-btn" onclick="deleteCurrentPlaylist()" title="Delete Playlist" class="hidden p-3 rounded-full hover:bg-red-500/20 text-red-400 hover:text-red-300 transition">
+                  <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tracks Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-spotify-subtext">
+              <thead class="text-xs uppercase border-b border-white/10 pb-2">
+                <tr>
+                  <th class="w-12 py-3 px-4">#</th>
+                  <th class="py-3 px-4">Title</th>
+                  <th class="py-3 px-4 hidden md:table-cell">Artist</th>
+                  <th class="w-20 py-3 px-4 text-right"><i data-lucide="clock" class="w-4 h-4 inline"></i></th>
+                  <th class="w-16 py-3 px-4"></th>
+                </tr>
+              </thead>
+              <tbody id="playlist-tracks-body" class="divide-y divide-white/5">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- VIEW: Full Karaoke Lyrics -->
+        <section id="view-lyrics" class="view-panel hidden h-full flex flex-col items-center">
+          <div class="w-full max-w-2xl py-4 flex items-center justify-between border-b border-white/10 mb-6">
+            <div>
+              <div id="lyrics-title" class="text-xl font-bold text-white">Song Title</div>
+              <div id="lyrics-artist" class="text-sm text-cyan-400">Artist Name</div>
+            </div>
+            <button onclick="toggleLyrics()" class="text-spotify-subtext hover:text-white p-2 rounded-full hover:bg-white/10 transition">
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
+
+          <div id="lyrics-container" class="flex-1 w-full max-w-2xl overflow-y-auto custom-scrollbar text-center py-12 space-y-6">
+            <!-- Synced lines injected by app.js -->
+            <div class="text-spotify-subtext text-lg italic">Searching for lyrics...</div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Right Drawer: Up Next Queue -->
+      <div id="queue-drawer" class="hidden absolute top-16 right-0 bottom-0 w-80 bg-spotify-black/95 backdrop-blur-xl border-l border-white/10 p-5 flex flex-col z-30 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+          <h3 class="font-bold text-white flex items-center gap-2">
+            <i data-lucide="list-music" class="w-5 h-5 text-cyan-400"></i>
+            Play Queue
+          </h3>
+          <button onclick="toggleQueue()" class="text-spotify-subtext hover:text-white p-1 rounded-lg hover:bg-white/10 transition">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="text-xs uppercase font-bold text-spotify-subtext tracking-wider mb-2">Now Playing</div>
+        <div id="queue-now-playing" class="bg-white/5 p-2.5 rounded-xl flex items-center gap-3 mb-4">
+          <div class="text-xs text-spotify-subtext">No song playing</div>
+        </div>
+
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs uppercase font-bold text-spotify-subtext tracking-wider">Next Up</div>
+          <button onclick="clearQueue()" class="text-xs text-red-400 hover:text-red-300 font-medium">Clear</button>
+        </div>
+        <div id="queue-list" class="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1 text-sm">
+          <div class="text-xs text-spotify-subtext text-center py-4">Queue is empty</div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Bottom Persistent Music Player (Desktop Screens) -->
+  <footer class="hidden md:flex h-20 bg-[#121212] border-t border-white/10 px-3 md:px-4 items-center justify-between z-40 select-none shrink-0">
+
+    <!-- Left Track Details -->
+    <div class="flex items-center gap-2.5 md:gap-3 w-full md:w-1/4 max-w-[280px] md:min-w-[210px] overflow-hidden">
+      <div class="relative group shrink-0">
+        <img id="player-thumb" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&h=100&fit=crop" alt="Track Art" class="w-12 h-12 md:w-14 md:h-14 rounded-lg object-cover bg-neutral-800 shadow-md transition group-hover:opacity-80" />
+        <button onclick="toggleMiniVideo()" title="Show/Hide Video" class="absolute inset-0 m-auto w-7 h-7 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
+          <i data-lucide="tv" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="overflow-hidden flex-1">
+        <div id="player-title" class="text-xs md:text-sm font-semibold text-white truncate hover:underline cursor-pointer">Choose a song to play</div>
+        <div id="player-artist" class="text-[11px] md:text-xs text-spotify-subtext truncate hover:text-white cursor-pointer">Muzo Free Music</div>
+      </div>
+      <!-- Like Button -->
+      <button id="player-like-btn" onclick="toggleLikeCurrentSong()" title="Save to Liked Songs" class="p-1.5 text-spotify-subtext hover:text-cyan-400 transition shrink-0">
+        <i data-lucide="heart" class="w-4 h-4 md:w-5 md:h-5"></i>
+      </button>
+      <!-- Add to Playlist Button (Always Visible) -->
+      <button id="player-add-playlist-btn" onclick="openAddToPlaylistModalForCurrent()" title="Add to Playlist" class="inline-flex p-1.5 text-spotify-subtext hover:text-cyan-400 transition shrink-0">
+        <i data-lucide="plus-circle" class="w-4 h-4 md:w-5 md:h-5"></i>
+      </button>
+    </div>
+
+    <!-- Center Playback Controls -->
+    <div class="flex flex-col items-center gap-1 flex-1 max-w-xl px-2">
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-3 md:gap-5">
+        <button id="btn-shuffle" onclick="toggleShuffle()" title="Shuffle" class="inline-flex text-spotify-subtext hover:text-cyan-400 transition">
+          <i data-lucide="shuffle" class="w-4 h-4"></i>
+        </button>
+        <button onclick="playPrevTrack()" title="Previous" class="text-spotify-subtext hover:text-white transition">
+          <i data-lucide="skip-back" class="w-4 h-4 md:w-5 md:h-5 fill-current"></i>
+        </button>
+        <button id="btn-play-pause" onclick="togglePlayPause()" title="Play/Pause" class="w-9 h-9 md:w-10 md:h-10 rounded-full bg-cyan-400 hover:bg-cyan-300 hover:scale-105 active:scale-95 text-black flex items-center justify-center transition shadow-lg shadow-cyan-400/25">
+          <i data-lucide="play" class="w-5 h-5 fill-black ml-0.5"></i>
+        </button>
+        <button onclick="playNextTrack()" title="Next" class="text-spotify-subtext hover:text-white transition">
+          <i data-lucide="skip-forward" class="w-4 h-4 md:w-5 md:h-5 fill-current"></i>
+        </button>
+        <button id="btn-repeat" onclick="toggleRepeat()" title="Repeat" class="inline-flex text-spotify-subtext hover:text-cyan-400 transition">
+          <i data-lucide="repeat" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Scrubber Timeline -->
+      <div class="w-full flex items-center gap-2 text-[10px] md:text-xs text-spotify-subtext font-mono">
+        <span id="player-time-current">0:00</span>
+        <div id="progress-container" class="relative flex-1 h-1.5 bg-white/20 hover:h-2 rounded-full cursor-pointer transition-all group">
+          <div id="progress-bar" class="absolute top-0 left-0 h-full bg-gradient-to-r from-teal-400 to-cyan-400 rounded-full w-0 transition-all shadow-[0_0_10px_rgba(34,211,238,0.5)]"></div>
+        </div>
+        <span id="player-time-total">0:00</span>
+      </div>
+    </div>
+
+    <!-- Right Extra Controls (Desktop) -->
+    <div class="hidden md:flex items-center justify-end gap-3 w-1/4 min-w-[180px]">
+      <button id="btn-toggle-video" onclick="toggleMiniVideo()" title="Official Video / Canvas" class="p-2 text-spotify-subtext hover:text-cyan-300 transition">
+        <i data-lucide="tv" class="w-4 h-4"></i>
+      </button>
+      <button onclick="toggleLyrics()" title="Lyrics" class="p-2 text-spotify-subtext hover:text-cyan-300 transition">
+        <i data-lucide="mic" class="w-4 h-4"></i>
+      </button>
+      <button onclick="toggleQueue()" title="Queue" class="p-2 text-spotify-subtext hover:text-cyan-300 transition">
+        <i data-lucide="list-music" class="w-4 h-4"></i>
+      </button>
+
+      <!-- Volume Bar -->
+      <div class="flex items-center gap-2 group">
+        <button id="btn-volume-icon" onclick="toggleMute()" class="text-spotify-subtext hover:text-cyan-400 transition">
+          <i data-lucide="volume-2" class="w-4 h-4"></i>
+        </button>
+        <input
+          id="volume-slider"
+          type="range"
+          min="0"
+          max="100"
+          value="80"
+          class="w-20 h-1 bg-white/20 hover:bg-white/40 accent-cyan-400 rounded-full cursor-pointer transition"
+        />
+      </div>
+    </div>
+  </footer>
+
+  <!-- Dedicated Mobile Floating Mini-Player (Uncluttered Spotify Style) -->
+  <div id="mobile-mini-player" class="md:hidden flex flex-col bg-[#161618]/98 backdrop-blur-2xl border-t border-white/10 select-none shrink-0 z-40 relative shadow-2xl">
+    <!-- Slim Real-Time Progress Bar -->
+    <div class="w-full h-1 bg-white/10 cursor-pointer relative" onclick="seekFromMobileMini(event)">
+      <div id="mobile-mini-progress" class="h-full bg-gradient-to-r from-teal-400 to-cyan-400 rounded-full w-0 transition-all shadow-[0_0_8px_rgba(34,211,238,0.7)]"></div>
+    </div>
+
+    <!-- Mini Player Content Row -->
+    <div class="h-14 px-3 flex items-center justify-between gap-2">
+      <!-- Left: Song Info (Tap to expand full screen) -->
+      <div class="flex items-center gap-2.5 overflow-hidden flex-1 cursor-pointer min-w-0" onclick="openMobilePlayer()">
+        <img id="mob-player-thumb" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&h=100&fit=crop" alt="Track Art" class="w-10 h-10 rounded-lg object-cover bg-neutral-800 shadow shrink-0" />
+        <div class="overflow-hidden flex-1 min-w-0 pr-1">
+          <div id="mob-player-title" class="text-xs font-bold text-white truncate">Choose a song</div>
+          <div id="mob-player-artist" class="text-[10px] text-spotify-subtext truncate">Muzo Free Music</div>
+        </div>
+      </div>
+
+      <!-- Right: Mobile Touch Buttons (Always Visible!) -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <!-- Like Button -->
+        <button id="mob-player-like-btn" onclick="toggleLikeCurrentSong()" title="Like Song" class="w-9 h-9 rounded-full flex items-center justify-center text-spotify-subtext hover:text-cyan-400 transition active:scale-90">
+          <i data-lucide="heart" class="w-5 h-5"></i>
+        </button>
+        <!-- Add to Playlist Button -->
+        <button id="mob-player-add-playlist-btn" onclick="openAddToPlaylistModalForCurrent()" title="Add to Playlist" class="w-9 h-9 rounded-full flex items-center justify-center text-cyan-400 hover:text-cyan-300 transition active:scale-90">
+          <i data-lucide="plus-circle" class="w-5 h-5"></i>
+        </button>
+        <!-- Play / Pause Button -->
+        <button id="mob-player-play-pause-btn" onclick="togglePlayPause()" title="Play/Pause" class="w-9 h-9 rounded-full bg-gradient-to-tr from-teal-400 to-cyan-400 text-black flex items-center justify-center shadow-md shadow-cyan-400/30 transition active:scale-90">
+          <i data-lucide="play" class="w-5 h-5 fill-black ml-0.5"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar (Spotify Style) -->
+  <nav class="md:hidden flex items-center justify-around bg-[#121212]/98 backdrop-blur-xl border-t border-white/10 py-2.5 z-40 shrink-0 pb-[calc(0.6rem+env(safe-area-inset-bottom,0px))]">
+    <button id="mob-nav-home" onclick="showView('home')" class="mobile-nav-btn active flex flex-col items-center gap-1 text-cyan-400 transition">
+      <i data-lucide="home" class="w-5 h-5"></i>
+      <span class="text-[10px] font-medium">Home</span>
+    </button>
+    <button id="mob-nav-search" onclick="focusSearch()" class="mobile-nav-btn flex flex-col items-center gap-1 text-spotify-subtext hover:text-white transition">
+      <i data-lucide="search" class="w-5 h-5"></i>
+      <span class="text-[10px] font-medium">Search</span>
+    </button>
+    <button id="mob-nav-library" onclick="showView('library')" class="mobile-nav-btn flex flex-col items-center gap-1 text-spotify-subtext hover:text-white transition">
+      <i data-lucide="library" class="w-5 h-5"></i>
+      <span class="text-[10px] font-medium">Library</span>
+    </button>
+    <button onclick="toggleLyrics()" class="mobile-nav-btn flex flex-col items-center gap-1 text-spotify-subtext hover:text-white transition">
+      <i data-lucide="mic" class="w-5 h-5"></i>
+      <span class="text-[10px] font-medium">Lyrics</span>
+    </button>
+    <button onclick="openMobileConnectModal()" class="mobile-nav-btn flex flex-col items-center gap-1 text-cyan-300 hover:text-white transition">
+      <i data-lucide="smartphone" class="w-5 h-5"></i>
+      <span class="text-[10px] font-medium">Phone App</span>
+    </button>
+  </nav>
+
+  <!-- Fullscreen Mobile Now Playing Screen Sheet -->
+  <div id="mobile-player-modal" class="md:hidden fixed inset-0 z-50 bg-[#0c0c0e] flex flex-col justify-between p-6 transition-transform duration-300 ease-out transform translate-y-full select-none overflow-y-auto">
+    <!-- Top Bar: Minimize Chevron, Title, Add to Playlist -->
+    <div class="flex items-center justify-between pt-2">
+      <button onclick="closeMobilePlayer()" title="Minimize" class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition active:scale-90">
+        <i data-lucide="chevron-down" class="w-6 h-6"></i>
+      </button>
+      <div class="text-center">
+        <span class="text-[10px] uppercase font-extrabold tracking-widest text-cyan-400">Now Playing</span>
+        <div id="mob-full-context" class="text-xs text-spotify-subtext truncate max-w-[200px]">Muzo High-Speed</div>
+      </div>
+      <button onclick="openAddToPlaylistModalForCurrent()" title="Add to Playlist" class="w-10 h-10 rounded-full bg-white/10 hover:bg-cyan-500 hover:text-black flex items-center justify-center text-cyan-400 transition active:scale-90">
+        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- Center Album Artwork & Live Video Toggle -->
+    <div class="my-auto py-4 flex flex-col items-center">
+      <div class="relative w-full max-w-[320px] aspect-square rounded-2xl overflow-hidden shadow-[0_15px_45px_rgba(0,0,0,0.85),0_0_30px_rgba(34,211,238,0.25)] border border-white/10 bg-neutral-900 group">
+        <img id="mob-full-thumb" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&h=500&fit=crop" class="w-full h-full object-cover transition duration-500">
+        <button onclick="toggleMiniVideo()" class="absolute bottom-3 right-3 px-3 py-1.5 rounded-full bg-black/80 hover:bg-cyan-500 hover:text-black text-white text-xs font-semibold flex items-center gap-1.5 backdrop-blur-md transition border border-white/10 shadow-lg">
+          <i data-lucide="tv" class="w-3.5 h-3.5"></i>
+          <span>Video Stream</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom Controls & Timeline -->
+    <div class="space-y-5 pb-4">
+      <!-- Title & Artist Row with Like button -->
+      <div class="flex items-center justify-between gap-4">
+        <div class="overflow-hidden flex-1 min-w-0">
+          <div id="mob-full-title" class="text-xl font-black text-white truncate">Choose a song</div>
+          <div id="mob-full-artist" class="text-sm font-medium text-spotify-subtext truncate mt-0.5">Muzo Free Music</div>
+        </div>
+        <button id="mob-full-like-btn" onclick="toggleLikeCurrentSong()" title="Like" class="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-spotify-subtext hover:text-cyan-400 transition shrink-0 active:scale-90">
+          <i data-lucide="heart" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <!-- Scrubber Timeline -->
+      <div class="space-y-1.5">
+        <div id="mob-full-progress-container" class="relative w-full h-2 bg-white/20 hover:h-2.5 rounded-full cursor-pointer transition-all" onclick="seekFromMobileFull(event)">
+          <div id="mob-full-progress-bar" class="absolute top-0 left-0 h-full bg-gradient-to-r from-teal-400 to-cyan-400 rounded-full w-0 transition-all shadow-[0_0_12px_rgba(34,211,238,0.7)]"></div>
+        </div>
+        <div class="flex items-center justify-between text-xs text-spotify-subtext font-mono">
+          <span id="mob-full-time-current">0:00</span>
+          <span id="mob-full-time-total">0:00</span>
+        </div>
+      </div>
+
+      <!-- Main Playback Buttons -->
+      <div class="flex items-center justify-between px-2">
+        <button id="mob-full-shuffle" onclick="toggleShuffle()" title="Shuffle" class="p-3 text-spotify-subtext hover:text-cyan-400 transition active:scale-90">
+          <i data-lucide="shuffle" class="w-5 h-5"></i>
+        </button>
+        <button onclick="playPrevTrack()" title="Previous" class="p-3 text-white hover:text-cyan-400 transition active:scale-90">
+          <i data-lucide="skip-back" class="w-7 h-7 fill-current"></i>
+        </button>
+        <button id="mob-full-play-pause" onclick="togglePlayPause()" title="Play/Pause" class="w-16 h-16 rounded-full bg-gradient-to-tr from-teal-400 to-cyan-400 hover:scale-105 active:scale-95 text-black flex items-center justify-center transition shadow-[0_0_25px_rgba(34,211,238,0.45)]">
+          <i data-lucide="play" class="w-8 h-8 fill-black ml-1"></i>
+        </button>
+        <button onclick="playNextTrack()" title="Next" class="p-3 text-white hover:text-cyan-400 transition active:scale-90">
+          <i data-lucide="skip-forward" class="w-7 h-7 fill-current"></i>
+        </button>
+        <button id="mob-full-repeat" onclick="toggleRepeat()" title="Repeat" class="p-3 text-spotify-subtext hover:text-cyan-400 transition active:scale-90">
+          <i data-lucide="repeat" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Quick Action Extras: Video, Lyrics, Queue -->
+      <div class="flex items-center justify-around pt-2 border-t border-white/5 text-spotify-subtext">
+        <button onclick="toggleMiniVideo()" class="flex items-center gap-1.5 text-xs font-semibold hover:text-cyan-300 py-1.5 px-3 rounded-full hover:bg-white/5 transition">
+          <i data-lucide="tv" class="w-4 h-4"></i>
+          <span>Video</span>
+        </button>
+        <button onclick="toggleLyrics(); closeMobilePlayer();" class="flex items-center gap-1.5 text-xs font-semibold hover:text-cyan-300 py-1.5 px-3 rounded-full hover:bg-white/5 transition">
+          <i data-lucide="mic" class="w-4 h-4"></i>
+          <span>Lyrics</span>
+        </button>
+        <button onclick="toggleQueue(); closeMobilePlayer();" class="flex items-center gap-1.5 text-xs font-semibold hover:text-cyan-300 py-1.5 px-3 rounded-full hover:bg-white/5 transition">
+          <i data-lucide="list-music" class="w-4 h-4"></i>
+          <span>Queue</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- High Speed Active YouTube Audio Engine Container (Always active in DOM & unthrottled) -->
+  <div id="mini-video-container" class="video-docked fixed bottom-24 right-6 bg-black rounded-2xl overflow-hidden border border-cyan-500/30">
+    <div class="flex items-center justify-between bg-black/90 px-3 py-1.5 text-xs text-white border-b border-white/10">
+      <span class="text-cyan-400 font-medium flex items-center gap-1.5"><i data-lucide="tv" class="w-3.5 h-3.5"></i> Video Stream</span>
+      <button onclick="toggleMiniVideo()" class="text-spotify-subtext hover:text-white text-xs font-bold p-1">✕ Minimize</button>
+    </div>
+    <div id="yt-player-frame" class="w-full h-[calc(100%-28px)] bg-black"></div>
+  </div>
+
+  <!-- Create Playlist Modal -->
+  <div id="create-playlist-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-spotify-card border border-cyan-500/20 p-6 rounded-2xl w-full max-w-sm shadow-2xl space-y-4">
+      <h3 class="text-lg font-bold text-white">Create New Playlist</h3>
+      <input id="new-playlist-input" type="text" placeholder="My Awesome Playlist" class="w-full px-4 py-2.5 bg-[#242424] text-white rounded-xl outline-none focus:ring-2 focus:ring-cyan-400 text-sm border border-white/5" />
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="closeCreatePlaylistModal()" class="px-4 py-2 text-sm text-spotify-subtext hover:text-white transition">Cancel</button>
+        <button onclick="saveNewPlaylist()" class="px-5 py-2 bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-300 hover:to-cyan-300 text-black text-sm font-bold rounded-full transition shadow-lg shadow-cyan-400/20">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add to Playlist Picker Modal -->
+  <div id="add-to-playlist-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-spotify-card border border-cyan-500/20 p-6 rounded-2xl w-full max-w-md shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <div>
+          <h3 class="text-lg font-bold text-white">Add to Playlist</h3>
+          <p id="modal-song-name" class="text-xs text-cyan-300 truncate max-w-[280px]">Select a playlist</p>
+        </div>
+        <button onclick="closeAddToPlaylistModal()" class="text-spotify-subtext hover:text-white text-lg">✕</button>
+      </div>
+
+      <!-- Quick Create Playlist inline in modal -->
+      <div class="flex gap-2">
+        <input id="modal-new-playlist-input" type="text" placeholder="New playlist name..." class="flex-1 px-3 py-1.5 bg-[#242424] text-white text-xs rounded-lg outline-none focus:ring-1 focus:ring-cyan-400 border border-white/10" />
+        <button onclick="createAndAddPlaylistFromModal()" class="px-3 py-1.5 bg-gradient-to-r from-teal-400 to-cyan-400 hover:from-teal-300 hover:to-cyan-300 text-black text-xs font-bold rounded-lg transition shrink-0 shadow-md shadow-cyan-400/20">
+          + Create
+        </button>
+      </div>
+
+      <!-- Playlists list -->
+      <div id="modal-playlist-list" class="space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar text-sm pt-1">
+        <!-- Playlists items populated by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Connect Mobile & Other Devices Modal -->
+  <div id="mobile-connect-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+    <div class="bg-[#181818] border border-cyan-500/30 p-6 rounded-3xl w-full max-w-md shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-400 via-teal-400 to-cyan-400 flex items-center justify-center text-black shadow-lg shadow-cyan-500/20 shrink-0">
+            <i data-lucide="smartphone" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-black text-white">Muzo on Mobile & Devices</h3>
+            <p class="text-xs text-spotify-subtext">Play & install on your phone, tablet, or laptop</p>
+          </div>
+        </div>
+        <button onclick="closeMobileConnectModal()" class="text-spotify-subtext hover:text-white text-lg p-1">✕</button>
+      </div>
+
+      <!-- QR Code and Mobile Link -->
+      <div class="flex flex-col items-center text-center gap-3 bg-white/5 p-4 rounded-2xl border border-white/5">
+        <div class="p-2 bg-white rounded-xl shadow-lg">
+          <img id="mobile-qr-code" src="" alt="Scan with Phone Camera" class="w-36 h-36 object-contain rounded-lg">
+        </div>
+        <p class="text-xs text-spotify-subtext">Scan with your phone camera, or open this link on your phone:</p>
+        <div class="flex items-center gap-2 w-full">
+          <input id="mobile-url-input" type="text" readonly class="flex-1 bg-[#121212] px-3 py-2 rounded-xl text-cyan-300 font-mono text-xs border border-white/10 outline-none" />
+          <button onclick="copyMobileUrl()" class="px-3.5 py-2 bg-gradient-to-r from-teal-400 to-cyan-400 text-black text-xs font-bold rounded-xl transition hover:scale-105 shadow-md shadow-cyan-400/20">
+            Copy
+          </button>
+        </div>
+      </div>
+
+      <!-- Step-by-step PWA Installation instructions -->
+      <div class="space-y-2.5 text-xs text-spotify-subtext">
+        <div class="font-bold text-white text-sm flex items-center gap-2">
+          <i data-lucide="download" class="w-4 h-4 text-cyan-400"></i>
+          <span>How to Install as an App:</span>
+        </div>
+        <div class="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1">
+          <span class="font-semibold text-cyan-300 flex items-center gap-1.5">🍏 iPhone & iPad (iOS):</span>
+          <p>1. Open the link above in <strong class="text-white">Safari</strong>.</p>
+          <p>2. Tap the <strong class="text-white">Share icon</strong> (the square with the arrow pointing up) at the bottom.</p>
+          <p>3. Tap <strong class="text-white">"Add to Home Screen"</strong> — Muzo installs as a native app with full offline controls!</p>
+        </div>
+
+        <div class="p-3 bg-white/5 rounded-xl border border-white/5 space-y-1">
+          <span class="font-semibold text-cyan-300 flex items-center gap-1.5">🤖 Android (Samsung, Pixel, OnePlus, etc.):</span>
+          <p>1. Open the link in <strong class="text-white">Chrome</strong> or your browser.</p>
+          <p>2. Tap the 3 dots menu and tap <strong class="text-white">"Install app"</strong> or <strong class="text-white">"Add to Home screen"</strong>.</p>
+        </div>
+
+        <div class="p-3 bg-gradient-to-r from-teal-950/40 to-cyan-950/40 rounded-xl border border-cyan-500/20 space-y-1 text-[11px]">
+          <span class="font-semibold text-white flex items-center gap-1">🌐 Away from Home / Cellular (4G/5G):</span>
+          <p>On your home Wi-Fi, the link connects directly. To access Muzo when you're away from home, you can use a free Cloudflare Tunnel with 1 command for a worldwide HTTPS link!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-6 right-6 bg-spotify-card text-white px-4 py-3 rounded-xl border border-cyan-500/30 shadow-2xl shadow-cyan-500/10 flex items-center gap-3 text-sm z-50 translate-y-[-100px] opacity-0 transition-all duration-300">
+    <i id="toast-icon" data-lucide="check-circle" class="w-5 h-5 text-cyan-400"></i>
+    <span id="toast-msg">Notification</span>
+  </div>
+
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

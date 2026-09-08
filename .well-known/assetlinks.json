@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.muzo.music",
+        "sha256_cert_fingerprints": ["9D:13:96:53:B2:54:4A:81:9A:29:A5:05:6B:5F:05:CD:56:7A:6B:97:86:40:F4:0C:BF:74:CC:D3:70:F7:45:8F"]
+      }
+    }]

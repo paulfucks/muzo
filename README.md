@@ -4,6 +4,21 @@ A modern, ad-free music streaming web application inspired by **Spotify** and **
 
 ---
 
+## 📥 Downloads & Releases
+
+Get the official latest release (**v2.0.0**) for your device directly from [**GitHub Releases**](https://github.com/paulfucks/muzo/releases):
+
+| Platform | Download | Description |
+| :--- | :--- | :--- |
+| **🤖 Android** | [**Muzo-2.0.0.apk**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0.apk) | Standalone Android App (~3.7 MB) |
+| **🪟 Windows** | [**Muzo-2.0.0.exe**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0.exe) | Standalone Desktop Player (No browser bars) |
+| **🪟 Windows (Portable)** | [**Muzo-2.0.0-windows-x64.zip**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0-windows-x64.zip) | Portable Full Windows Package |
+| **🐧 Linux** | [**Muzo-2.0.0.AppImage**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0.AppImage) | Portable Linux Launcher |
+| **🐧 Linux (Tarball)** | [**Muzo-2.0.0-linux-x64.tar.gz**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0-linux-x64.tar.gz) | Complete Linux Package |
+| **🔐 Verification** | [**Muzo-v2.0.0.sha256sum**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-v2.0.0.sha256sum) | SHA256 Checksums |
+
+---
+
 ## ☁️ 24/7 Always Running Cloud Setup (Free Forever)
 
 You can run Muzo in the cloud **24/7 for free** so you and your friends can use it on your phones forever without needing your PC turned on!

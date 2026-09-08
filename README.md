@@ -4,18 +4,31 @@ A modern, ad-free music streaming web application inspired by **Spotify** and **
 
 ---
 
+## 🌐 Live 24/7 Web App (No PC Required!)
+
+Muzo is live in the cloud and accessible 24/7 on any phone, tablet, or browser:
+👉 **[https://paulfucks.github.io/muzo/public/](https://paulfucks.github.io/muzo/public/)**
+
+---
+
 ## 📥 Downloads & Releases
 
 Get the official latest release (**v2.0.0**) for your device directly from [**GitHub Releases**](https://github.com/paulfucks/muzo/releases):
 
 | Platform | Download | Description |
 | :--- | :--- | :--- |
-| **🤖 Android** | [**Muzo-2.0.0.apk**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0.apk) | Standalone Android App (~3.7 MB) |
-| **🪟 Windows** | [**Muzo-2.0.0.exe**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0.exe) | Standalone Desktop Player (No browser bars) |
+| **🤖 Android** | [**Muzo-2.0.0.apk**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0.apk) | Official Muzo Android App (~1.2 MB, Signed APK) |
+| **🤖 Android (Store Bundle)** | [**Muzo-2.0.0.aab**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0.aab) | Android App Bundle (for Google Play Console) |
+| **🪟 Windows PC** | [**Muzo-2.0.0.exe**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0.exe) | Standalone Windows Player (Desktop App Mode) |
 | **🪟 Windows (Portable)** | [**Muzo-2.0.0-windows-x64.zip**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0-windows-x64.zip) | Portable Full Windows Package |
 | **🐧 Linux** | [**Muzo-2.0.0.AppImage**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0.AppImage) | Portable Linux Launcher |
 | **🐧 Linux (Tarball)** | [**Muzo-2.0.0-linux-x64.tar.gz**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-2.0.0-linux-x64.tar.gz) | Complete Linux Package |
 | **🔐 Verification** | [**Muzo-v2.0.0.sha256sum**](https://github.com/paulfucks/muzo/releases/download/v2.0.0/Muzo-v2.0.0.sha256sum) | SHA256 Checksums |
+
+> **⚠️ Note on File Types:**
+> - `.apk` files are for **Android devices**.
+> - `.exe` files are for **Windows PCs only** (Windows executables cannot be opened on Android).
+> - `.AppImage` files are for **Linux systems**.
 
 ---
 

@@ -28,6 +28,8 @@ const state = {
 // High-speed client-side cache
 const clientSearchCache = new Map();
 const clientChartsCache = new Map();
+const ytIdCache = new Map();
+let previewAudioElement = null;
 
 let ytPlayer = null;
 let progressTimer = null;
@@ -150,20 +152,80 @@ function playTrack(track, newQueue = null, indexInQueue = null) {
   }
   updateQueueUI();
 
-  // Instant Audio Playback: Request lightweight stream directly with zero delay
-  if (ytPlayer && ytPlayer.loadVideoById) {
+  // Stop previous preview audio if any
+  if (previewAudioElement) {
     try {
-      ytPlayer.loadVideoById({
-        videoId: track.id,
-        suggestedQuality: 'small'
-      });
-      ytPlayer.playVideo();
-    } catch (e) {
+      previewAudioElement.pause();
+      previewAudioElement.src = '';
+      previewAudioElement = null;
+    } catch (e) {}
+  }
+
+  const isResolvedYtId = track.id && typeof track.id === 'string' && track.id.match(/^[a-zA-Z0-9_-]{11}$/) && !track.id.startsWith('itunes_');
+
+  if (isResolvedYtId) {
+    // Instant Audio Playback: Request lightweight stream directly with zero delay
+    if (ytPlayer && ytPlayer.loadVideoById) {
       try {
-        ytPlayer.loadVideoById(track.id);
+        ytPlayer.loadVideoById({
+          videoId: track.id,
+          suggestedQuality: 'small'
+        });
         ytPlayer.playVideo();
-      } catch (err) {}
+      } catch (e) {
+        try {
+          ytPlayer.loadVideoById(track.id);
+          ytPlayer.playVideo();
+        } catch (err) {}
+      }
     }
+  } else {
+    // Dynamic stream resolution (e.g. from global iTunes catalog)
+    showToast(`Connecting stream: ${track.title}...`, 'music');
+
+    // Instant audio feedback: play 30s AAC preview with 0ms delay while full stream resolves
+    if (track.preview) {
+      try {
+        previewAudioElement = new Audio(track.preview);
+        previewAudioElement.volume = state.volume / 100;
+        previewAudioElement.play().catch(() => {});
+        state.isPlaying = true;
+        updatePlayPauseButton();
+      } catch (e) {}
+    }
+
+    const resQuery = track.resolvedQuery || `${track.title} ${track.artist}`;
+    resolveYouTubeId(resQuery).then(ytId => {
+      if (previewAudioElement) {
+        try {
+          previewAudioElement.pause();
+          previewAudioElement.src = '';
+          previewAudioElement = null;
+        } catch (e) {}
+      }
+
+      if (ytId) {
+        track.id = ytId;
+        if (ytPlayer && ytPlayer.loadVideoById) {
+          try {
+            ytPlayer.loadVideoById({ videoId: ytId, suggestedQuality: 'small' });
+            ytPlayer.playVideo();
+          } catch (e) {
+            try {
+              ytPlayer.loadVideoById(ytId);
+              ytPlayer.playVideo();
+            } catch (err) {}
+          }
+        }
+        showToast(`Playing: ${track.title}`, 'music');
+        if (state.activeView === 'lyrics') {
+          fetchAndRenderLyrics(track);
+        }
+      } else if (!track.preview) {
+        showToast('Playback unavailable for this track, skipping...', 'alert-circle');
+        setTimeout(() => playNextTrack(), 1500);
+      }
+    });
   }
 
   // Record history locally (instant)
@@ -195,6 +257,18 @@ function recordHistory(track) {
 }
 
 function togglePlayPause() {
+  if (previewAudioElement) {
+    if (previewAudioElement.paused) {
+      previewAudioElement.play();
+      state.isPlaying = true;
+    } else {
+      previewAudioElement.pause();
+      state.isPlaying = false;
+    }
+    updatePlayPauseButton();
+    return;
+  }
+
   if (!state.currentTrack) {
     const firstTrending = state.queue[0];
     if (firstTrending) playTrack(firstTrending);
@@ -492,11 +566,19 @@ async function fetchAndRenderRecommendations(seedTrack = null) {
     badge.innerText = "Trending Mix";
   }
 
+  let tracks = null;
   try {
     const res = await fetch(`/api/recommendations?seed=${encodeURIComponent(seedQuery)}`);
-    const tracks = await res.json();
+    if (res.ok) tracks = await res.json();
+  } catch (err) {}
 
-    if (tracks && tracks.length > 0) {
+  if (!tracks || tracks.length === 0) {
+    try {
+      tracks = await fetchDirectClientSearch(seedQuery);
+    } catch (e) {}
+  }
+
+  if (tracks && tracks.length > 0) {
       const filtered = tracks.filter(t => !seedTrack || t.id !== seedTrack.id).slice(0, 10);
       state.recommendations = filtered;
 
@@ -853,19 +935,24 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Universal Direct Search Fallback Mirrors (Open CORS endpoints)
+// Universal Direct Search Fallback Mirrors (Verified Live Endpoints with CORS)
 const PUBLIC_INVIDIOUS_MIRRORS = [
-  'https://inv.nadeko.net',
-  'https://invidious.nerdvpn.de',
-  'https://iv.melmac.space',
-  'https://yt.drgnz.club'
+  'https://invidious.f5.si',
+  'https://invidious.flokinet.to',
+  'https://yewtu.be',
+  'https://inv.tux.pizza',
+  'https://invidious.privacydev.net'
 ];
 
-async function fetchDirectClientSearch(query) {
+async function resolveYouTubeId(query) {
+  if (!query || !query.trim()) return null;
+  const cacheKey = query.toLowerCase().trim();
+  if (ytIdCache.has(cacheKey)) return ytIdCache.get(cacheKey);
+
   for (const mirror of PUBLIC_INVIDIOUS_MIRRORS) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3500);
+      const timeout = setTimeout(() => controller.abort(), 2600);
       const res = await fetch(`${mirror}/api/v1/search?q=${encodeURIComponent(query)}&type=video`, {
         signal: controller.signal
       });
@@ -874,16 +961,82 @@ async function fetchDirectClientSearch(query) {
 
       const items = await res.json();
       if (Array.isArray(items) && items.length > 0) {
-        return items.filter(it => it.videoId && it.lengthSeconds).map(it => ({
-          id: it.videoId,
-          title: it.title || 'Unknown Song',
-          artist: it.author || 'Muzo Artist',
-          duration: formatTime(it.lengthSeconds),
-          thumbnail: `https://i.ytimg.com/vi/${it.videoId}/hqdefault.jpg`
-        })).slice(0, 25);
+        const match = items.find(it => it.videoId && it.lengthSeconds) || items[0];
+        if (match && match.videoId) {
+          ytIdCache.set(cacheKey, match.videoId);
+          return match.videoId;
+        }
       }
     } catch (e) {}
   }
+  return null;
+}
+
+async function fetchItunesSearch(query) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=25`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (data && Array.isArray(data.results) && data.results.length > 0) {
+      return data.results.map(it => {
+        const sec = Math.floor((it.trackTimeMillis || 210000) / 1000);
+        const art = (it.artworkUrl100 || '').replace('100x100bb', '600x600bb');
+        return {
+          id: 'itunes_' + it.trackId,
+          title: it.trackName || 'Unknown Song',
+          artist: it.artistName || 'Muzo Artist',
+          duration: formatTime(sec),
+          thumbnail: art || `https://i.ytimg.com/vi/4NRXx6U8ABQ/hqdefault.jpg`,
+          preview: it.previewUrl || null,
+          resolvedQuery: `${it.trackName} ${it.artistName}`
+        };
+      });
+    }
+  } catch (e) {
+    console.warn('iTunes search fallback notice:', e);
+  }
+  return null;
+}
+
+async function fetchDirectClientSearch(query) {
+  // 1. First attempt: Query live Invidious mirrors with fast timeout
+  for (const mirror of PUBLIC_INVIDIOUS_MIRRORS) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch(`${mirror}/api/v1/search?q=${encodeURIComponent(query)}&type=video`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (!res.ok) continue;
+
+      const items = await res.json();
+      if (Array.isArray(items) && items.length > 0) {
+        const valid = items.filter(it => it.videoId && (it.lengthSeconds || it.title)).map(it => ({
+          id: it.videoId,
+          title: it.title || 'Unknown Song',
+          artist: it.author || 'Muzo Artist',
+          duration: formatTime(it.lengthSeconds || 210),
+          thumbnail: `https://i.ytimg.com/vi/${it.videoId}/hqdefault.jpg`
+        })).slice(0, 25);
+
+        if (valid.length > 0) return valid;
+      }
+    } catch (e) {}
+  }
+
+  // 2. High-reliability fallback: Apple iTunes Official Global Music Catalog (100% CORS, 100% Uptime)
+  const itunesResults = await fetchItunesSearch(query);
+  if (itunesResults && itunesResults.length > 0) {
+    return itunesResults;
+  }
+
   return null;
 }
 
@@ -1002,7 +1155,9 @@ function searchAndPlayQuery(query) {
 const DEFAULT_CHART_FALLBACKS = {
   trending: [
     { id: '4NRXx6U8ABQ', title: 'Blinding Lights', artist: 'The Weeknd', duration: '3:20', thumbnail: 'https://i.ytimg.com/vi/4NRXx6U8ABQ/hqdefault.jpg' },
+    { id: 'ic8j13piAhQ', title: 'Cruel Summer', artist: 'Taylor Swift', duration: '2:58', thumbnail: 'https://i.ytimg.com/vi/ic8j13piAhQ/hqdefault.jpg' },
     { id: 'TUVcZfQe-Kw', title: 'Levitating', artist: 'Dua Lipa', duration: '3:23', thumbnail: 'https://i.ytimg.com/vi/TUVcZfQe-Kw/hqdefault.jpg' },
+    { id: '7wtfhZwyrcc', title: 'Believer', artist: 'Imagine Dragons', duration: '3:24', thumbnail: 'https://i.ytimg.com/vi/7wtfhZwyrcc/hqdefault.jpg' },
     { id: 'JGwWNGJdvx8', title: 'Shape of You', artist: 'Ed Sheeran', duration: '3:53', thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg' },
     { id: 'ApXoWvfEYVU', title: 'Sunflower (Spider-Man)', artist: 'Post Malone, Swae Lee', duration: '2:38', thumbnail: 'https://i.ytimg.com/vi/ApXoWvfEYVU/hqdefault.jpg' },
     { id: 'kJQP7kiw5Fk', title: 'Despacito', artist: 'Luis Fonsi ft. Daddy Yankee', duration: '3:48', thumbnail: 'https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg' },
@@ -1014,30 +1169,38 @@ const DEFAULT_CHART_FALLBACKS = {
     { id: 'pmanD_s7G3U', title: 'Gurenge (Demon Slayer)', artist: 'LiSA', duration: '3:58', thumbnail: 'https://i.ytimg.com/vi/pmanD_s7G3U/hqdefault.jpg' },
     { id: '1FlicTWXsCA', title: 'Shinunoga E-Wa', artist: 'Fujii Kaze', duration: '3:05', thumbnail: 'https://i.ytimg.com/vi/1FlicTWXsCA/hqdefault.jpg' },
     { id: 'v2K1aZ5fR3w', title: 'Unravel (Tokyo Ghoul)', artist: 'TK from Ling Tosite Sigure', duration: '3:58', thumbnail: 'https://i.ytimg.com/vi/v2K1aZ5fR3w/hqdefault.jpg' },
-    { id: 'O2ZlE9f9O-4', title: 'Blue Bird (Naruto Shippuden)', artist: 'Ikimonogakari', duration: '3:35', thumbnail: 'https://i.ytimg.com/vi/O2ZlE9f9O-4/hqdefault.jpg' }
+    { id: 'O2ZlE9f9O-4', title: 'Blue Bird (Naruto Shippuden)', artist: 'Ikimonogakari', duration: '3:35', thumbnail: 'https://i.ytimg.com/vi/O2ZlE9f9O-4/hqdefault.jpg' },
+    { id: 'JH_3bHjXk_w', title: 'Kaikai Kitan (Jujutsu Kaisen)', artist: 'Eve', duration: '3:40', thumbnail: 'https://i.ytimg.com/vi/JH_3bHjXk_w/hqdefault.jpg' },
+    { id: 'dFla3uI-QZ8', title: 'Suzume', artist: 'RADWIMPS ft. Toaka', duration: '3:58', thumbnail: 'https://i.ytimg.com/vi/dFla3uI-QZ8/hqdefault.jpg' }
   ],
   pop: [
     { id: 'TUVcZfQe-Kw', title: 'Levitating', artist: 'Dua Lipa', duration: '3:23', thumbnail: 'https://i.ytimg.com/vi/TUVcZfQe-Kw/hqdefault.jpg' },
     { id: '4NRXx6U8ABQ', title: 'Blinding Lights', artist: 'The Weeknd', duration: '3:20', thumbnail: 'https://i.ytimg.com/vi/4NRXx6U8ABQ/hqdefault.jpg' },
     { id: 'vRXZj0DzXIA', title: 'Cruel Summer', artist: 'Taylor Swift', duration: '2:58', thumbnail: 'https://i.ytimg.com/vi/vRXZj0DzXIA/hqdefault.jpg' },
-    { id: 'H5v3kku4y6Q', title: 'As It Was', artist: 'Harry Styles', duration: '2:47', thumbnail: 'https://i.ytimg.com/vi/H5v3kku4y6Q/hqdefault.jpg' }
+    { id: 'H5v3kku4y6Q', title: 'As It Was', artist: 'Harry Styles', duration: '2:47', thumbnail: 'https://i.ytimg.com/vi/H5v3kku4y6Q/hqdefault.jpg' },
+    { id: 'JGwWNGJdvx8', title: 'Shape of You', artist: 'Ed Sheeran', duration: '3:53', thumbnail: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg' },
+    { id: 'k2qgadSvNyU', title: 'New Rules', artist: 'Dua Lipa', duration: '3:45', thumbnail: 'https://i.ytimg.com/vi/k2qgadSvNyU/hqdefault.jpg' }
   ],
   hiphop: [
     { id: 'JFm7YDVlqnI', title: "God's Plan", artist: 'Drake', duration: '3:18', thumbnail: 'https://i.ytimg.com/vi/JFm7YDVlqnI/hqdefault.jpg' },
     { id: 'tvTRZJ-4EyI', title: 'HUMBLE.', artist: 'Kendrick Lamar', duration: '2:57', thumbnail: 'https://i.ytimg.com/vi/tvTRZJ-4EyI/hqdefault.jpg' },
-    { id: 'ApXoWvfEYVU', title: 'Sunflower', artist: 'Post Malone, Swae Lee', duration: '2:38', thumbnail: 'https://i.ytimg.com/vi/ApXoWvfEYVU/hqdefault.jpg' }
+    { id: 'ApXoWvfEYVU', title: 'Sunflower', artist: 'Post Malone, Swae Lee', duration: '2:38', thumbnail: 'https://i.ytimg.com/vi/ApXoWvfEYVU/hqdefault.jpg' },
+    { id: 'Y2E788k9iVI', title: 'Lucid Dreams', artist: 'Juice WRLD', duration: '4:00', thumbnail: 'https://i.ytimg.com/vi/Y2E788k9iVI/hqdefault.jpg' }
   ],
   chill: [
     { id: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio - Beats to Relax/Study to', artist: 'Lofi Girl', duration: '3:45', thumbnail: 'https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg' },
-    { id: 'DWcJFNfaw9c', title: 'Weightless', artist: 'Marconi Union', duration: '8:08', thumbnail: 'https://i.ytimg.com/vi/DWcJFNfaw9c/hqdefault.jpg' }
+    { id: 'DWcJFNfaw9c', title: 'Weightless', artist: 'Marconi Union', duration: '8:08', thumbnail: 'https://i.ytimg.com/vi/DWcJFNfaw9c/hqdefault.jpg' },
+    { id: '5qap5aO4i9A', title: 'Lofi Chill Beats', artist: 'ChilledCow', duration: '3:30', thumbnail: 'https://i.ytimg.com/vi/5qap5aO4i9A/hqdefault.jpg' }
   ],
   rock: [
     { id: 'fJ9rUzIMcZQ', title: 'Bohemian Rhapsody', artist: 'Queen', duration: '5:55', thumbnail: 'https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg' },
-    { id: 'hTWKbfoikeg', title: 'Smells Like Teen Spirit', artist: 'Nirvana', duration: '5:01', thumbnail: 'https://i.ytimg.com/vi/hTWKbfoikeg/hqdefault.jpg' }
+    { id: 'hTWKbfoikeg', title: 'Smells Like Teen Spirit', artist: 'Nirvana', duration: '5:01', thumbnail: 'https://i.ytimg.com/vi/hTWKbfoikeg/hqdefault.jpg' },
+    { id: 'kXYiU_JCYtU', title: 'Numb', artist: 'Linkin Park', duration: '3:07', thumbnail: 'https://i.ytimg.com/vi/kXYiU_JCYtU/hqdefault.jpg' }
   ],
   bollywood: [
-    { id: 'Umqb9KENgmk', title: 'Kesariya', artist: 'Arijit Singh, Pritam', duration: '4:28', thumbnail: 'https://i.ytimg.com/vi/Umqb9KENgmk/hqdefault.jpg' },
-    { id: 'k4yXQkGLeAA', title: 'Raataan Lambiyan', artist: 'Jubin Nautiyal, Asees Kaur', duration: '3:50', thumbnail: 'https://i.ytimg.com/vi/k4yXQkGLeAA/hqdefault.jpg' }
+    { id: 'BddP6PYo2gs', title: 'Kesariya', artist: 'Arijit Singh, Pritam', duration: '4:28', thumbnail: 'https://i.ytimg.com/vi/BddP6PYo2gs/hqdefault.jpg' },
+    { id: 'k4yXQkGLeAA', title: 'Raataan Lambiyan', artist: 'Jubin Nautiyal, Asees Kaur', duration: '3:50', thumbnail: 'https://i.ytimg.com/vi/k4yXQkGLeAA/hqdefault.jpg' },
+    { id: '4iZgC1L9yS8', title: 'Chaleya (Jawan)', artist: 'Arijit Singh, Shilpa Rao', duration: '3:20', thumbnail: 'https://i.ytimg.com/vi/4iZgC1L9yS8/hqdefault.jpg' }
   ]
 };
 

@@ -76,7 +76,7 @@ namespace MuzoApp
 
         private static void LaunchDesktopWindow(int port)
         {
-            string url = "http://localhost:" + port;
+            string url = IsPortInUse(port) ? ("http://localhost:" + port) : "https://paulfucks.github.io/muzo/public/";
             string[] browsers = new string[]
             {
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"Microsoft\Edge\Application\msedge.exe"),
@@ -129,7 +129,7 @@ namespace MuzoApp
 
             ContextMenu menu = new ContextMenu();
             menu.MenuItems.Add("🎵 Open Muzo", (s, e) => LaunchDesktopWindow(port));
-            menu.MenuItems.Add("📱 Connect Phone", (s, e) => Process.Start("http://localhost:" + port));
+            menu.MenuItems.Add("🌐 Web Version", (s, e) => Process.Start("https://paulfucks.github.io/muzo/public/"));
             menu.MenuItems.Add("-");
             menu.MenuItems.Add("❌ Exit Muzo", (s, e) => {
                 trayIcon.Visible = false;

@@ -1952,5 +1952,26 @@ let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
+  const installBtn = document.getElementById('btn-install-app');
+  if (installBtn) {
+    installBtn.classList.remove('hidden');
+    lucide.createIcons();
+  }
   console.log('Muzo is ready to be installed as an App!');
 });
+
+function installApp() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        showToast('Installing Muzo...', 'check-circle');
+      }
+      deferredPrompt = null;
+      const installBtn = document.getElementById('btn-install-app');
+      if (installBtn) installBtn.classList.add('hidden');
+    });
+  } else {
+    openMobileConnectModal();
+  }
+}

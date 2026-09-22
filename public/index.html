@@ -156,6 +156,10 @@
 
         <!-- Right Header Icons -->
         <div class="flex items-center gap-2 shrink-0">
+          <button id="btn-install-app" onclick="installApp()" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-400 hover:bg-cyan-300 text-black text-xs font-bold transition hover:scale-105 shadow-md shadow-cyan-400/20" title="Install Standalone App">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>Install App</span>
+          </button>
           <button onclick="openMobileConnectModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-teal-500/15 to-cyan-500/15 hover:from-teal-500/25 hover:to-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition hover:scale-105 shadow-sm shadow-cyan-500/10" title="Connect Phone / Tablet">
             <i data-lucide="smartphone" class="w-4 h-4"></i>
             <span class="hidden sm:inline">Phone App</span>

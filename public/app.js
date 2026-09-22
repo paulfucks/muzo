@@ -22,8 +22,84 @@ const state = {
   currentCategory: 'trending',
   pendingSongForPlaylist: null,
   isVideoOpen: false,
-  recommendations: []
+  recommendations: [],
+  chartTracks: [],
+  quickPicks: [],
+  searchResults: [],
+  currentPlaylistTracks: [],
+  pendingTrackToPlay: null,
+  isPlayerReady: false
 };
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Track Play Click Helpers (100% robust against special chars/quotes in titles)
+function playChartTrack(idx) {
+  if (state.chartTracks && state.chartTracks[idx]) {
+    playTrack(state.chartTracks[idx], state.chartTracks, idx);
+  }
+}
+
+function openAddChartTrack(e, idx) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  if (state.chartTracks && state.chartTracks[idx]) {
+    openAddToPlaylistModal(state.chartTracks[idx]);
+  }
+}
+
+function playQuickPickTrack(idx) {
+  if (state.quickPicks && state.quickPicks[idx]) {
+    playTrack(state.quickPicks[idx], state.quickPicks, idx);
+  }
+}
+
+function openAddQuickPick(e, idx) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  if (state.quickPicks && state.quickPicks[idx]) {
+    openAddToPlaylistModal(state.quickPicks[idx]);
+  }
+}
+
+function playSearchTrack(idx) {
+  if (state.searchResults && state.searchResults[idx]) {
+    playTrack(state.searchResults[idx], state.searchResults, idx);
+  }
+}
+
+function openAddSearchTrack(e, idx) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  if (state.searchResults && state.searchResults[idx]) {
+    openAddToPlaylistModal(state.searchResults[idx]);
+  }
+}
+
+function playRecommendationTrack(idx) {
+  if (state.recommendations && state.recommendations[idx]) {
+    playTrack(state.recommendations[idx], state.recommendations, idx);
+  }
+}
+
+function openAddRecommendationTrack(e, idx) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  if (state.recommendations && state.recommendations[idx]) {
+    openAddToPlaylistModal(state.recommendations[idx]);
+  }
+}
+
+function playPlaylistTrack(idx) {
+  const tracks = state.currentPlaylistTracks || (activePlaylistId === 'liked' ? state.likedSongs : (state.playlists.find(p => p.id === activePlaylistId)?.tracks || []));
+  if (tracks && tracks[idx]) {
+    playTrack(tracks[idx], tracks, idx);
+  }
+}
 
 // High-speed client-side cache
 const clientSearchCache = new Map();
@@ -37,34 +113,57 @@ let searchDebounceTimer = null;
 let recommendationDebounceTimer = null;
 
 // =================================================================
-// 1. YouTube Player Setup (High Priority Audio Engine)
+// 1. YouTube Player Setup (Resilient Audio Engine)
 // =================================================================
+function initYouTubePlayer() {
+  if (ytPlayer || !window.YT || !window.YT.Player) return;
+  try {
+    ytPlayer = new YT.Player('yt-player-frame', {
+      height: '100%',
+      width: '100%',
+      videoId: 'Rif-RTvmmss', // Pre-warm audio engine immediately
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        disablekb: 1,
+        fs: 0,
+        modestbranding: 1,
+        rel: 0,
+        playsinline: 1
+      },
+      events: {
+        onReady: onPlayerReady,
+        onStateChange: onPlayerStateChange,
+        onError: onPlayerError
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to init YT player:', e);
+  }
+}
+
 window.onYouTubeIframeAPIReady = function() {
-  ytPlayer = new YT.Player('yt-player-frame', {
-    height: '100%',
-    width: '100%',
-    videoId: 'Rif-RTvmmss', // Pre-warm audio engine immediately
-    playerVars: {
-      autoplay: 0,
-      controls: 0,
-      disablekb: 1,
-      fs: 0,
-      modestbranding: 1,
-      rel: 0,
-      playsinline: 1,
-      origin: window.location.origin
-    },
-    events: {
-      onReady: onPlayerReady,
-      onStateChange: onPlayerStateChange,
-      onError: onPlayerError
-    }
-  });
+  initYouTubePlayer();
 };
 
+// Also check immediately in case YouTube API loaded before app.js
+if (window.YT && window.YT.Player) {
+  initYouTubePlayer();
+}
+
 function onPlayerReady(event) {
-  event.target.setVolume(state.volume);
+  state.isPlayerReady = true;
+  try {
+    event.target.setVolume(state.volume);
+  } catch (e) {}
   updateVolumeUI();
+
+  // If a user tapped play before player finished loading, start it now
+  if (state.pendingTrackToPlay) {
+    const t = state.pendingTrackToPlay;
+    state.pendingTrackToPlay = null;
+    playTrack(t);
+  }
 }
 
 function onPlayerStateChange(event) {
@@ -90,8 +189,10 @@ function onPlayerError(event) {
 
 function handleTrackEnded() {
   if (state.repeatMode === 2) {
-    ytPlayer.seekTo(0);
-    ytPlayer.playVideo();
+    if (ytPlayer && ytPlayer.seekTo) {
+      ytPlayer.seekTo(0);
+      ytPlayer.playVideo();
+    }
   } else {
     playNextTrack();
   }
@@ -579,26 +680,25 @@ async function fetchAndRenderRecommendations(seedTrack = null) {
   }
 
   if (tracks && tracks.length > 0) {
-      const filtered = tracks.filter(t => !seedTrack || t.id !== seedTrack.id).slice(0, 10);
-      state.recommendations = filtered;
+    const filtered = tracks.filter(t => !seedTrack || t.id !== seedTrack.id).slice(0, 10);
+    state.recommendations = filtered;
 
-      container.innerHTML = filtered.map((track, idx) => `
-        <div class="music-card bg-spotify-card p-3.5 rounded-2xl cursor-pointer group relative border border-white/5" onclick='playTrack(${JSON.stringify(track).replace(/'/g, "&#39;")}, ${JSON.stringify(filtered).replace(/'/g, "&#39;")}, ${idx})'>
-          <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-3 shadow-lg bg-neutral-800">
-            <img src="${track.thumbnail}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-            <button class="play-btn absolute bottom-3 right-3 w-10 h-10 rounded-full bg-gradient-to-r from-teal-400 to-cyan-400 flex items-center justify-center text-black shadow-xl shadow-cyan-400/30 hover:scale-110 active:scale-95 transition">
-              <i data-lucide="play" class="w-5 h-5 fill-black ml-0.5"></i>
-            </button>
-            <button onclick="event.stopPropagation(); openAddToPlaylistModal(${JSON.stringify(track).replace(/'/g, "&#39;")})" title="Add to Playlist" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 hover:bg-cyan-500 hover:text-black text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition shadow">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-            </button>
-          </div>
-          <div class="font-bold text-white text-sm truncate mb-0.5">${track.title}</div>
-          <div class="text-xs text-spotify-subtext truncate">${track.artist}</div>
+    container.innerHTML = filtered.map((track, idx) => `
+      <div class="music-card bg-spotify-card p-3.5 rounded-2xl cursor-pointer group relative border border-white/5" onclick="playRecommendationTrack(${idx})">
+        <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-3 shadow-lg bg-neutral-800">
+          <img src="${track.thumbnail}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+          <button class="play-btn absolute bottom-3 right-3 w-10 h-10 rounded-full bg-gradient-to-r from-teal-400 to-cyan-400 flex items-center justify-center text-black shadow-xl shadow-cyan-400/30 hover:scale-110 active:scale-95 transition">
+            <i data-lucide="play" class="w-5 h-5 fill-black ml-0.5"></i>
+          </button>
+          <button onclick="openAddRecommendationTrack(event, ${idx})" title="Add to Playlist" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 hover:bg-cyan-500 hover:text-black text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition shadow">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+          </button>
         </div>
-      `).join('');
-    }
-  } catch (err) {}
+        <div class="font-bold text-white text-sm truncate mb-0.5">${escapeHtml(track.title)}</div>
+        <div class="text-xs text-spotify-subtext truncate">${escapeHtml(track.artist)}</div>
+      </div>
+    `).join('');
+  }
   lucide.createIcons();
 }
 
@@ -1094,24 +1194,25 @@ async function performSearch(query) {
 }
 
 function renderSearchResults(results) {
+  state.searchResults = results;
   document.getElementById('search-count').innerText = `${results.length} songs found`;
   const listEl = document.getElementById('search-results-list');
   const topCardEl = document.getElementById('top-result-card');
 
   const top = results[0];
   topCardEl.innerHTML = `
-    <div class="flex flex-col gap-4" onclick='playTrack(${JSON.stringify(top).replace(/'/g, "&#39;")}, ${JSON.stringify(results).replace(/'/g, "&#39;")}, 0)'>
+    <div class="flex flex-col gap-4 cursor-pointer" onclick="playSearchTrack(0)">
       <img src="${top.thumbnail}" class="w-32 h-32 rounded-xl object-cover shadow-2xl">
       <div>
         <span class="text-xs uppercase font-bold text-cyan-400 tracking-wider">Top Result</span>
-        <h2 class="text-2xl font-black text-white mt-1 mb-1 line-clamp-1">${top.title}</h2>
-        <p class="text-sm text-spotify-subtext">${top.artist} • <span class="font-mono">${top.duration}</span></p>
+        <h2 class="text-2xl font-black text-white mt-1 mb-1 line-clamp-1">${escapeHtml(top.title)}</h2>
+        <p class="text-sm text-spotify-subtext">${escapeHtml(top.artist)} • <span class="font-mono">${top.duration}</span></p>
       </div>
       <div class="flex items-center gap-3">
         <button class="w-12 h-12 rounded-full bg-gradient-to-r from-teal-400 to-cyan-400 flex items-center justify-center text-black shadow-xl shadow-cyan-400/25 hover:scale-105">
           <i data-lucide="play" class="w-6 h-6 fill-black ml-0.5"></i>
         </button>
-        <button onclick="event.stopPropagation(); openAddToPlaylistModal(${JSON.stringify(top).replace(/'/g, "&#39;")})" title="Add to Playlist" class="p-2.5 rounded-full bg-white/10 hover:bg-cyan-500 hover:text-black text-white transition">
+        <button onclick="openAddSearchTrack(event, 0)" title="Add to Playlist" class="p-2.5 rounded-full bg-white/10 hover:bg-cyan-500 hover:text-black text-white transition">
           <i data-lucide="plus" class="w-5 h-5"></i>
         </button>
       </div>
@@ -1119,7 +1220,7 @@ function renderSearchResults(results) {
   `;
 
   listEl.innerHTML = results.map((track, idx) => `
-    <div class="track-row flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 group cursor-pointer" onclick='playTrack(${JSON.stringify(track).replace(/'/g, "&#39;")}, ${JSON.stringify(results).replace(/'/g, "&#39;")}, ${idx})'>
+    <div class="track-row flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 group cursor-pointer" onclick="playSearchTrack(${idx})">
       <div class="flex items-center gap-3 overflow-hidden flex-1">
         <div class="w-6 text-center text-xs text-spotify-subtext shrink-0">
           <span class="row-index font-mono">${idx + 1}</span>
@@ -1127,12 +1228,12 @@ function renderSearchResults(results) {
         </div>
         <img src="${track.thumbnail}" class="w-11 h-11 rounded-lg object-cover bg-neutral-800 shrink-0 shadow">
         <div class="overflow-hidden pr-2">
-          <div class="text-sm font-semibold text-white truncate">${track.title}</div>
-          <div class="text-xs text-spotify-subtext truncate">${track.artist}</div>
+          <div class="text-sm font-semibold text-white truncate">${escapeHtml(track.title)}</div>
+          <div class="text-xs text-spotify-subtext truncate">${escapeHtml(track.artist)}</div>
         </div>
       </div>
       <div class="flex items-center gap-3 shrink-0">
-        <button onclick="event.stopPropagation(); openAddToPlaylistModal(${JSON.stringify(track).replace(/'/g, "&#39;")})" title="Add to Playlist" class="text-spotify-subtext hover:text-cyan-400 p-2 rounded-full hover:bg-white/10 transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+        <button onclick="openAddSearchTrack(event, ${idx})" title="Add to Playlist" class="text-spotify-subtext hover:text-cyan-400 p-2 rounded-full hover:bg-white/10 transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
         </button>
         <span class="text-xs text-spotify-subtext font-mono w-12 text-right">${track.duration}</span>
@@ -1210,11 +1311,12 @@ async function loadChartCategory(category) {
   document.querySelectorAll('.genre-pill').forEach(pill => {
     pill.classList.remove('active', 'bg-cyan-400', 'text-black', 'shadow-md', 'shadow-cyan-400/20');
     pill.classList.add('bg-white/10', 'text-white');
+    const fn = pill.getAttribute('onclick') || '';
+    if (fn.includes(`'${category}'`) || fn.includes(`"${category}"`)) {
+      pill.classList.add('active', 'bg-cyan-400', 'text-black', 'shadow-md', 'shadow-cyan-400/20');
+      pill.classList.remove('bg-white/10', 'text-white');
+    }
   });
-  if (event && event.target && event.target.classList.contains('genre-pill')) {
-    event.target.classList.add('active', 'bg-cyan-400', 'text-black', 'shadow-md', 'shadow-cyan-400/20');
-    event.target.classList.remove('bg-white/10', 'text-white');
-  }
 
   showView('home');
 
@@ -1252,33 +1354,35 @@ async function loadChartCategory(category) {
 }
 
 function renderChartGrid(tracks) {
+  state.chartTracks = tracks;
+  state.quickPicks = tracks.slice(0, 6);
+
   const gridEl = document.getElementById('trending-grid');
   gridEl.innerHTML = tracks.map((track, idx) => `
-    <div class="music-card bg-spotify-card p-3.5 rounded-2xl cursor-pointer group relative border border-white/5" onclick='playTrack(${JSON.stringify(track).replace(/'/g, "&#39;")}, ${JSON.stringify(tracks).replace(/'/g, "&#39;")}, ${idx})'>
+    <div class="music-card bg-spotify-card p-3.5 rounded-2xl cursor-pointer group relative border border-white/5" onclick="playChartTrack(${idx})">
       <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-3 shadow-lg bg-neutral-800">
         <img src="${track.thumbnail}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
         <button class="play-btn absolute bottom-3 right-3 w-10 h-10 rounded-full bg-gradient-to-r from-teal-400 to-cyan-400 flex items-center justify-center text-black shadow-xl shadow-cyan-400/30 hover:scale-110 active:scale-95 transition">
           <i data-lucide="play" class="w-5 h-5 fill-black ml-0.5"></i>
         </button>
-        <button onclick="event.stopPropagation(); openAddToPlaylistModal(${JSON.stringify(track).replace(/'/g, "&#39;")})" title="Add to Playlist" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 hover:bg-cyan-500 hover:text-black text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition shadow">
+        <button onclick="openAddChartTrack(event, ${idx})" title="Add to Playlist" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 hover:bg-cyan-500 hover:text-black text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition shadow">
           <i data-lucide="plus" class="w-4 h-4"></i>
         </button>
       </div>
-      <div class="font-bold text-white text-sm truncate mb-0.5">${track.title}</div>
-      <div class="text-xs text-spotify-subtext truncate">${track.artist}</div>
+      <div class="font-bold text-white text-sm truncate mb-0.5">${escapeHtml(track.title)}</div>
+      <div class="text-xs text-spotify-subtext truncate">${escapeHtml(track.artist)}</div>
     </div>
   `).join('');
 
-  const quickPicks = tracks.slice(0, 6);
-  document.getElementById('quick-picks-grid').innerHTML = quickPicks.map((track, idx) => `
-    <div class="flex items-center bg-white/5 hover:bg-white/10 rounded-xl overflow-hidden cursor-pointer group transition p-1.5 pr-3 hover:border-l-2 hover:border-cyan-400" onclick='playTrack(${JSON.stringify(track).replace(/'/g, "&#39;")}, ${JSON.stringify(tracks).replace(/'/g, "&#39;")}, ${idx})'>
+  document.getElementById('quick-picks-grid').innerHTML = state.quickPicks.map((track, idx) => `
+    <div class="flex items-center bg-white/5 hover:bg-white/10 rounded-xl overflow-hidden cursor-pointer group transition p-1.5 pr-3 hover:border-l-2 hover:border-cyan-400" onclick="playQuickPickTrack(${idx})">
       <img src="${track.thumbnail}" class="w-12 h-12 rounded-lg object-cover shrink-0">
       <div class="flex-1 px-3 overflow-hidden min-w-0">
-        <div class="font-bold text-sm text-white truncate">${track.title}</div>
-        <div class="text-xs text-spotify-subtext truncate">${track.artist}</div>
+        <div class="font-bold text-sm text-white truncate">${escapeHtml(track.title)}</div>
+        <div class="text-xs text-spotify-subtext truncate">${escapeHtml(track.artist)}</div>
       </div>
       <div class="flex items-center gap-1 shrink-0">
-        <button onclick="event.stopPropagation(); openAddToPlaylistModal(${JSON.stringify(track).replace(/'/g, "&#39;")})" title="Add to Playlist" class="w-7 h-7 rounded-full hover:bg-white/10 text-spotify-subtext hover:text-cyan-400 flex items-center justify-center transition">
+        <button onclick="openAddQuickPick(event, ${idx})" title="Add to Playlist" class="w-7 h-7 rounded-full hover:bg-white/10 text-spotify-subtext hover:text-cyan-400 flex items-center justify-center transition">
           <i data-lucide="plus" class="w-3.5 h-3.5"></i>
         </button>
         <button class="w-8 h-8 rounded-full bg-gradient-to-r from-teal-400 to-cyan-400 text-black flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 shadow-md transition hover:scale-105">
@@ -1349,6 +1453,7 @@ function showPlaylistDetail(id) {
 }
 
 function renderPlaylistTable(tracks) {
+  state.currentPlaylistTracks = tracks;
   const tbody = document.getElementById('playlist-tracks-body');
   if (!tracks || tracks.length === 0) {
     tbody.innerHTML = `
@@ -1360,7 +1465,7 @@ function renderPlaylistTable(tracks) {
   }
 
   tbody.innerHTML = tracks.map((track, idx) => `
-    <tr class="track-row cursor-pointer" onclick='playTrack(${JSON.stringify(track).replace(/'/g, "&#39;")}, ${JSON.stringify(tracks).replace(/'/g, "&#39;")}, ${idx})'>
+    <tr class="track-row cursor-pointer" onclick="playPlaylistTrack(${idx})">
       <td class="py-3 px-4 font-mono text-xs">
         <span class="row-index">${idx + 1}</span>
         <button class="row-play-btn text-cyan-400"><i data-lucide="play" class="w-4 h-4 fill-cyan-400"></i></button>
@@ -1368,11 +1473,11 @@ function renderPlaylistTable(tracks) {
       <td class="py-3 px-4 flex items-center gap-3 overflow-hidden">
         <img src="${track.thumbnail}" class="w-10 h-10 rounded-md object-cover bg-neutral-800 shrink-0">
         <div class="overflow-hidden">
-          <div class="font-semibold text-white truncate text-sm">${track.title}</div>
-          <div class="text-xs text-spotify-subtext md:hidden truncate">${track.artist}</div>
+          <div class="font-semibold text-white truncate text-sm">${escapeHtml(track.title)}</div>
+          <div class="text-xs text-spotify-subtext md:hidden truncate">${escapeHtml(track.artist)}</div>
         </div>
       </td>
-      <td class="py-3 px-4 hidden md:table-cell text-spotify-subtext truncate max-w-[180px]">${track.artist}</td>
+      <td class="py-3 px-4 hidden md:table-cell text-spotify-subtext truncate max-w-[180px]">${escapeHtml(track.artist)}</td>
       <td class="py-3 px-4 font-mono text-xs text-right">${track.duration}</td>
       <td class="py-3 px-4 text-right">
         <button onclick="event.stopPropagation(); removeTrackFromCurrentPlaylist(${idx})" title="Remove" class="text-spotify-subtext hover:text-red-400 p-1 transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
@@ -1836,7 +1941,7 @@ function copyMobileUrl() {
 // Register PWA Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(() => {
+    navigator.serviceWorker.register('./sw.js').then(() => {
       console.log('Muzo PWA Service Worker Registered!');
     }).catch(() => {});
   });
